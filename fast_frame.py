@@ -21,12 +21,8 @@ class FastFrame:
     def __init__(self, df=[]):
         self.columns = [col for col in df]
         self.col2idx = {col:i for i,col in enumerate(self.columns)}
-        try:
-            sers = [df[col].values for col in self.columns]
-        except:
-            sers = [df[col] for col in self.columns]
-        self.col_vals = np.array(sers)
-        self.row_vals = self.col_vals.T
+        self.row_vals = df.values if hasattr(df, 'values') else np.array([])
+        self.col_vals = self.row_vals.T
 
     def append(self, frames):
         self.row_vals = np.concatenate([self.row_vals]+[f.row_vals for f in frames])
@@ -43,6 +39,12 @@ class FastFrame:
         for c in self.columns:
             yield c
 
+    def __getattr__(self, attr):
+        i = self.col2idx.get(attr, -1)
+        if i >= 0:
+            return self.col_vals[i]
+        return super().__getattr__(attr)
+
     def __getitem__(self, arg):
         if type(arg) == slice:
             ff = FastFrame()
@@ -50,6 +52,13 @@ class FastFrame:
             ff.col2idx = self.col2idx
             ff.row_vals = self.row_vals[arg]
             ff.col_vals = ff.row_vals.T
+            return ff
+        if type(arg) == list:
+            ff = FastFrame()
+            ff.columns = arg
+            ff.col2idx = {col:i for i,col in enumerate(arg)}
+            ff.col_vals = self.col_vals[[self.col2idx[col] for col in arg]]
+            ff.row_vals = ff.col_vals.T
             return ff
         idx = self.col2idx[arg]
         return self.col_vals[idx]
@@ -78,3 +87,7 @@ def fast_concat(frames):
     f = frames[0]
     f.append(frames[1:])
     return f
+
+
+def to_frame(df):
+    return df if df is FastFrame else FastFrame(df)
